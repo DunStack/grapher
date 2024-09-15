@@ -7,20 +7,35 @@ import (
 	"github.com/graph-gophers/graphql-go"
 )
 
-func NewHandler(schema *graphql.Schema) *Handler {
-	return &Handler{
-		schema: schema,
+type HandlerOption func(h *Handler)
+
+func WithExplorer(name string) HandlerOption {
+	return func(h *Handler) {
+		h.explorer = name
 	}
 }
 
+func NewHandler(schema *graphql.Schema, opts ...HandlerOption) *Handler {
+	h := &Handler{schema: schema}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
+}
+
 type Handler struct {
-	schema *graphql.Schema
+	schema   *graphql.Schema
+	explorer string
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		http.ServeFile(w, r, "static/graphiql.html")
+		if e := h.explorer; e == "" {
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		} else {
+			http.ServeFile(w, r, e)
+		}
 	case http.MethodPost:
 		var payload struct {
 			Query     string         `json:"query"`
